@@ -59,6 +59,16 @@ class ScheduledTask implements Comparable<ScheduledTask>, ITask {
 
 
     /**
+     * Выполнить задачу
+     *
+     * @return результат выполнения задачи
+     */
+    @Override
+    public Object execute() throws Exception {
+        return callable.call();
+    }
+
+    /**
      * @return true если пришло время выполнить задачу
      */
     public boolean isNeedExecute() {
@@ -77,15 +87,5 @@ class ScheduledTask implements Comparable<ScheduledTask>, ITask {
      */
     private Date getDateCreated() {
         return dateCreated;
-    }
-
-    /**
-     * Выполнить задачу
-     *
-     * @return результат выполнения задачи
-     */
-    @Override
-    public Object execute() throws Exception {
-        return callable.call();
     }
 }
