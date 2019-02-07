@@ -1,5 +1,8 @@
 package ru.chernyshev.executor;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -8,6 +11,13 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Исполнитель задач по времени
  */
 class TimeTaskExecutor implements IExecutor, Runnable {
+
+    /**
+     * Время ожидания потока при отсутсвтии задач в очереди
+     */
+    private static final int WAIT_TIMEOUT_MILLIS = 10_000;
+
+    private final Logger logger = LogManager.getLogger(TimeTaskExecutor.class);
 
     /**
      * Приоритетная очередь задач
@@ -62,6 +72,9 @@ class TimeTaskExecutor implements IExecutor, Runnable {
     @Override
     public void add(ITask task) {
         queue.add(task);
+        synchronized (this) {
+            notify();
+        }
     }
 
     /**
@@ -69,8 +82,8 @@ class TimeTaskExecutor implements IExecutor, Runnable {
      */
     @Override
     public void run() {
-
         while (isRunning.get()) {
+            waitTask();
             final ITask task = queue.peek();
             if (task != null && task.isNeedExecute()) {
                 progressCount.incrementAndGet();
@@ -93,6 +106,19 @@ class TimeTaskExecutor implements IExecutor, Runnable {
                             progressCount.decrementAndGet();
                             return obj;
                         });
+            }
+        }
+    }
+
+    /**
+     * Переводит поток в состояние ожидания если в очереди нет задач.
+     * */
+    private synchronized void waitTask() {
+        if (queue.isEmpty()) {
+            try {
+                wait(WAIT_TIMEOUT_MILLIS);
+            } catch (InterruptedException e) {
+                logger.warn(e);
             }
         }
     }
