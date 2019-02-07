@@ -2,14 +2,19 @@ package ru.chernyshev.executor;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.Objects;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Обертка для задачи и времени в которое она должна быть выполненна
  */
-class ScheduledTask implements Comparable<ScheduledTask>, ITask {
+class ScheduledTask implements ITask<ScheduledTask> {
+
+    /**
+     * Генератор порядковых номеров задач
+     * */
+    private static final AtomicInteger ORDER_NUMBER_GENERATOR = new AtomicInteger(0);
 
     /**
      * Время в которое необходимо выполнить callable
@@ -22,9 +27,9 @@ class ScheduledTask implements Comparable<ScheduledTask>, ITask {
     private final Callable callable;
 
     /**
-     * Дата поступления задачи
+     * Порядковый номер поступления задачи
      */
-    private final Date dateCreated;
+    private final int orderNumber;
 
     /**
      * Создать объект
@@ -38,23 +43,23 @@ class ScheduledTask implements Comparable<ScheduledTask>, ITask {
         Objects.requireNonNull(callable);
         this.runningTime = runningTime;
         this.callable = callable;
-        this.dateCreated = new Date();
+        this.orderNumber = ORDER_NUMBER_GENERATOR.incrementAndGet();
     }
 
     /**
      * Сравнивает текущий объект {@link ScheduledTask} с другим объектом {@link ScheduledTask}
      * Первоначально сравнивает по дате выполнения runningTime,
-     * если даты равны, то сравнивает дату поступления задачи dateCreated
+     * если даты равны, то сравнивает порядковый номер поступления задачи orderNumber
      *
-     * @param task другой {@link ScheduledTask} для сравнения с текущим, не null
+     * @param o другой {@link ScheduledTask} для сравнения с текущим, не null
      * @return отрицательное если меньше, положительное если больше
      */
     @Override
-    public int compareTo(ScheduledTask task) {
+    public int compareTo(ScheduledTask o) {
         return Comparator
                 .comparing(ScheduledTask::getRunningTime, LocalDateTime::compareTo)
-                .thenComparing(ScheduledTask::getDateCreated, Date::compareTo)
-                .compare(this, task);
+                .thenComparing(ScheduledTask::getOrderNumber)
+                .compare(this, o);
     }
 
 
@@ -71,6 +76,7 @@ class ScheduledTask implements Comparable<ScheduledTask>, ITask {
     /**
      * @return true если пришло время выполнить задачу
      */
+    @Override
     public boolean isNeedExecute() {
         return LocalDateTime.now().compareTo(getRunningTime()) >= 0;
     }
@@ -83,9 +89,9 @@ class ScheduledTask implements Comparable<ScheduledTask>, ITask {
     }
 
     /**
-     * @return время в которое система получила информацию о задаче
+     * @return порядковый номер прихода задачи
      */
-    private Date getDateCreated() {
-        return dateCreated;
+    private int getOrderNumber() {
+        return orderNumber;
     }
 }

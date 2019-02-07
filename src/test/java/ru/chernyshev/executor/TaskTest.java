@@ -57,9 +57,8 @@ public class TaskTest {
      * Задачи с одинаковым временем выполнения должны выполнится по времени добавления
      */
     @Test
-    public void compareTaskTest3() throws InterruptedException {
+    public void compareTaskTest3() {
         ScheduledTask task1 = new ScheduledTask(NOW, () -> null);
-        Thread.sleep(1);
         ScheduledTask task2 = new ScheduledTask(NOW, () -> null);
         assertThat(task2.compareTo(task1), is(1));
     }

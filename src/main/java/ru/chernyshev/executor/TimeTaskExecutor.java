@@ -37,6 +37,7 @@ class TimeTaskExecutor implements IExecutor, Runnable {
     /**
      * Запусить исполнитель задач в отдельном потоке
      */
+    @Override
     public void turnOn() {
         boolean canStarted = isRunning.compareAndSet(false, true);
         if (!canStarted) {
@@ -48,6 +49,7 @@ class TimeTaskExecutor implements IExecutor, Runnable {
     /**
      * Остановить исполнитель задач
      */
+    @Override
     public void turnOff() {
         isRunning.set(false);
     }
@@ -57,6 +59,7 @@ class TimeTaskExecutor implements IExecutor, Runnable {
      *
      * @param task задача
      */
+    @Override
     public void add(ITask task) {
         queue.add(task);
     }
@@ -97,6 +100,7 @@ class TimeTaskExecutor implements IExecutor, Runnable {
     /**
      * @return количество выполняемых задач в текущий момент времени
      */
+    @Override
     public int getProgressCount() {
         return progressCount.get();
     }
@@ -104,6 +108,7 @@ class TimeTaskExecutor implements IExecutor, Runnable {
     /**
      * @return количество выполенных задач
      */
+    @Override
     public int getCompleteSuccessCount() {
         return completeSuccessCount.get();
     }
@@ -111,6 +116,7 @@ class TimeTaskExecutor implements IExecutor, Runnable {
     /**
      * @return количество завершенных с ошибкой
      */
+    @Override
     public int getCompleteErrorCount() {
         return completeErrorCount.get();
     }
