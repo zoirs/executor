@@ -5,7 +5,9 @@ import org.apache.logging.log4j.Logger;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.concurrent.*;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -86,36 +88,28 @@ class TimeTaskExecutor implements IExecutor, Runnable {
     @Override
     public void run() {
         while (isRunning.get()) {
-            ITask task = getFirstTask();
-            logger.trace("Thread is run");
-            if (task.isNeedExecute()) {
-                progressCount.incrementAndGet();
-                queue.remove(task);
+            ITask task = pollTask();
+            logger.trace("Task for time {} execute start", task.getRunningTime());
+            progressCount.incrementAndGet();
 
-                CompletableFuture
-                        .supplyAsync(() -> {
-                            try {
-                                return task.execute();
-                            } catch (Exception e) {
-                                throw new RuntimeException("Execute exception", e);
-                            }
-                        })
-                        .handle((obj, err) -> {
-                            if (err == null) {
-                                completeSuccessCount.incrementAndGet();
-                            } else {
-                                completeErrorCount.incrementAndGet();
-                            }
-                            progressCount.decrementAndGet();
-                            logger.trace("Task executed");
-                            return obj;
-                        });
-            } else {
-                long millisToExecute = LocalDateTime.now().until(task.getRunningTime(), ChronoUnit.MILLIS);
-                if (millisToExecute > 0) {
-                    waitTask(millisToExecute);
-                }
-            }
+            CompletableFuture
+                    .supplyAsync(() -> {
+                        try {
+                            return task.execute();
+                        } catch (Exception e) {
+                            throw new RuntimeException("Execute exception", e);
+                        }
+                    })
+                    .handle((obj, err) -> {
+                        if (err == null) {
+                            completeSuccessCount.incrementAndGet();
+                        } else {
+                            completeErrorCount.incrementAndGet();
+                        }
+                        progressCount.decrementAndGet();
+                        logger.trace("Task for time {} execute complete", task.getRunningTime());
+                        return obj;
+                    });
         }
     }
 
@@ -143,16 +137,28 @@ class TimeTaskExecutor implements IExecutor, Runnable {
         return completeErrorCount.get();
     }
 
-    private ITask getFirstTask() {
-        ITask task;
-        do {
-            task = queue.peek();
+    /**
+     * Извлечь и удалить первый элемент в очереди
+     */
+    private synchronized ITask pollTask() {
+        while (true) {
+            ITask task = queue.peek();
 
             if (task == null) {
                 waitTask(WAIT_TIMEOUT_MILLIS);
+                continue;
             }
-        } while (task == null);
-        return task;
+
+            if (task.isNeedExecute()) {
+                queue.remove(task);
+                return task;
+            } else {
+                long millisToExecute = LocalDateTime.now().until(task.getRunningTime(), ChronoUnit.MILLIS);
+                if (millisToExecute > 0) {
+                    waitTask(millisToExecute);
+                }
+            }
+        }
     }
 
     /**
@@ -161,8 +167,8 @@ class TimeTaskExecutor implements IExecutor, Runnable {
      * @param waitTimeoutMillis время ожидания
      */
     private synchronized void waitTask(long waitTimeoutMillis) {
+        logger.trace("Wait {} milliseconds", waitTimeoutMillis);
         try {
-            logger.trace("Wait {} milliseconds", waitTimeoutMillis);
             wait(waitTimeoutMillis);
         } catch (InterruptedException e) {
             logger.warn(e);
