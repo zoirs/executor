@@ -84,7 +84,7 @@ class ScheduledTask implements ITask<ScheduledTask> {
     /**
      * @return время в которое задача должна быть выполнена
      */
-    private LocalDateTime getRunningTime() {
+    public LocalDateTime getRunningTime() {
         return runningTime;
     }
 

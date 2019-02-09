@@ -3,6 +3,8 @@ package ru.chernyshev.executor;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -71,6 +73,7 @@ class TimeTaskExecutor implements IExecutor, Runnable {
      */
     @Override
     public void add(ITask task) {
+        logger.trace("Add new task to queue");
         queue.add(task);
         synchronized (this) {
             notify();
@@ -83,9 +86,9 @@ class TimeTaskExecutor implements IExecutor, Runnable {
     @Override
     public void run() {
         while (isRunning.get()) {
-            waitTask();
-            final ITask task = queue.peek();
-            if (task != null && task.isNeedExecute()) {
+            ITask task = getFirstTask();
+            logger.trace("Thread is run");
+            if (task.isNeedExecute()) {
                 progressCount.incrementAndGet();
                 queue.remove(task);
 
@@ -104,21 +107,14 @@ class TimeTaskExecutor implements IExecutor, Runnable {
                                 completeErrorCount.incrementAndGet();
                             }
                             progressCount.decrementAndGet();
+                            logger.trace("Task executed");
                             return obj;
                         });
-            }
-        }
-    }
-
-    /**
-     * Переводит поток в состояние ожидания если в очереди нет задач.
-     * */
-    private synchronized void waitTask() {
-        if (queue.isEmpty()) {
-            try {
-                wait(WAIT_TIMEOUT_MILLIS);
-            } catch (InterruptedException e) {
-                logger.warn(e);
+            } else {
+                long millisToExecute = LocalDateTime.now().until(task.getRunningTime(), ChronoUnit.MILLIS);
+                if (millisToExecute > 0) {
+                    waitTask(millisToExecute);
+                }
             }
         }
     }
@@ -145,5 +141,31 @@ class TimeTaskExecutor implements IExecutor, Runnable {
     @Override
     public int getCompleteErrorCount() {
         return completeErrorCount.get();
+    }
+
+    private ITask getFirstTask() {
+        ITask task;
+        do {
+            task = queue.peek();
+
+            if (task == null) {
+                waitTask(WAIT_TIMEOUT_MILLIS);
+            }
+        } while (task == null);
+        return task;
+    }
+
+    /**
+     * Переводит поток в состояние ожидания
+     *
+     * @param waitTimeoutMillis время ожидания
+     */
+    private synchronized void waitTask(long waitTimeoutMillis) {
+        try {
+            logger.trace("Wait {} milliseconds", waitTimeoutMillis);
+            wait(waitTimeoutMillis);
+        } catch (InterruptedException e) {
+            logger.warn(e);
+        }
     }
 }
